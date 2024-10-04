@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   useFloating,
   autoUpdate,
+  autoPlacement,
   offset,
   shift,
   limitShift,
@@ -107,6 +108,15 @@ type PopperContentContextValue = {
 const [PopperContentProvider, useContentContext] =
   createPopperContext<PopperContentContextValue>(CONTENT_NAME);
 
+function getPlacement(side: Side, align: Align) {
+  return (side + (align !== 'center' ? '-' + align : '')) as Placement;
+}
+
+function getAllowedPlacements(side: Side, align: Align) {
+  const sides: Side[] = side === 'top' || side === 'bottom' ? ['top', 'bottom'] : ['left', 'right'];
+  return sides.map((side) => getPlacement(side, align));
+}
+
 type Boundary = Element | null;
 
 type PopperContentElement = React.ElementRef<typeof Primitive.div>;
@@ -116,7 +126,7 @@ interface PopperContentProps extends PrimitiveDivProps {
   align?: Align;
   alignOffset?: number;
   arrowPadding?: number;
-  avoidCollisions?: boolean;
+  avoidCollisions?: boolean | 'flip' | 'autoPlacement';
   collisionBoundary?: Boundary | Boundary[];
   collisionPadding?: number | Partial<Record<Side, number>>;
   sticky?: 'partial' | 'always';
@@ -154,7 +164,7 @@ const PopperContent = React.forwardRef<PopperContentElement, PopperContentProps>
     const arrowWidth = arrowSize?.width ?? 0;
     const arrowHeight = arrowSize?.height ?? 0;
 
-    const desiredPlacement = (side + (align !== 'center' ? '-' + align : '')) as Placement;
+    const desiredPlacement = getPlacement(side, align);
 
     const collisionPadding =
       typeof collisionPaddingProp === 'number'
@@ -193,7 +203,13 @@ const PopperContent = React.forwardRef<PopperContentElement, PopperContentProps>
             limiter: sticky === 'partial' ? limitShift() : undefined,
             ...detectOverflowOptions,
           }),
-        avoidCollisions && flip({ ...detectOverflowOptions }),
+        avoidCollisions === true || avoidCollisions === 'flip'
+          ? flip({ ...detectOverflowOptions })
+          : avoidCollisions === 'autoPlacement' &&
+            autoPlacement({
+              ...detectOverflowOptions,
+              allowedPlacements: getAllowedPlacements(side, align),
+            }),
         size({
           ...detectOverflowOptions,
           apply: ({ elements, rects, availableWidth, availableHeight }) => {
